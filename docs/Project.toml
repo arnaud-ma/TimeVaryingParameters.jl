@@ -1,3 +1,6 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 TimeVaryingParameters = "c3441385-f229-4866-8817-bbca1834e4b8"
+
+[compat]
+Documenter = "1.17.0"
