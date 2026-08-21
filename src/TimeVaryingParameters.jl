@@ -64,7 +64,7 @@ eval_basis(b::PolynomialBasis, t::Real) = [t^d for d in 1:b.degree]
 A purely trigonometric basis of a given order and period.
 Note: Does not include the intercept baseline.
 """
-struct FourierBasis{T<:Real} <: AbstractBasis
+struct FourierBasis{T <: Real} <: AbstractBasis
     length_period::T
     order::Int
 end
@@ -82,7 +82,7 @@ function eval_basis(b::FourierBasis, t::Real)
     vals = zeros(Float64, 2 * b.order)
     for k in 1:b.order
         vals[2k - 1] = cos(k * ω * t)
-        vals[2k]     = sin(k * ω * t)
+        vals[2k] = sin(k * ω * t)
     end
     return vals
 end
@@ -146,15 +146,15 @@ function default_optimizer()
 end
 
 const DEFAULT_OPTIMS_KWARGS = (;
-    adtype=ADTypes.AutoForwardDiff(),
-    optim_function_kwargs=(;),
-    optim_problem_kwargs=(;),
-    optim_solve_kwargs=(;),
+    adtype = ADTypes.AutoForwardDiff(),
+    optim_function_kwargs = (;),
+    optim_problem_kwargs = (;),
+    optim_solve_kwargs = (;),
 )
 
-function get_optim_func(score_func, init; optim=default_optimizer(), kwargs_...)
+function get_optim_func(score_func, init; optim = default_optimizer(), kwargs_...)
     k = merge(DEFAULT_OPTIMS_KWARGS, kwargs_)
-    function optim_func(null_data=nothing)
+    function optim_func(null_data = nothing)
         f = OptimizationFunction(score_func, k.adtype; k.optim_function_kwargs...)
         prob = OptimizationProblem(f, init, null_data; k.optim_problem_kwargs...)
         return solve(prob, optim; k.optim_solve_kwargs...)
@@ -171,7 +171,7 @@ struct TimeVaryingModel{B <: NamedTuple, L <: NamedTuple}
 end
 TimeVaryingModel(; bases, links) = TimeVaryingModel(bases, links)
 
-struct TimeVaryingObjective{F, M , L}
+struct TimeVaryingObjective{F, M, L}
     func::F
     design_matrices::M # NamedTuple of precomputed matrices B_j
     link_funcs::L      # NamedTuple of link functions
