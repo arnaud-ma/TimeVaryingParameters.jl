@@ -1,6 +1,6 @@
 name = "TimeVaryingParameters"
 uuid = "c3441385-f229-4866-8817-bbca1834e4b8"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["arnaud-ma <arnaudma.code@gmail.com> and contributors"]
 
 [deps]
