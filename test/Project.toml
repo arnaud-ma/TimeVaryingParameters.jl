@@ -1,4 +1,17 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LinkFunctions = "fa965eab-f9a2-49de-8293-bc60088b3cbc"
+LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
+OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TimeVaryingParameters = "c3441385-f229-4866-8817-bbca1834e4b8"
+
+[sources]
+TimeVaryingParameters = {path = ".."}
