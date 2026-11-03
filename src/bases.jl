@@ -206,14 +206,18 @@ Base.:+(a::CombinedBasis, b::CombinedBasis) = CombinedBasis((a.bases..., b.bases
 nbasis(b::CombinedBasis) = sum(nbasis, b.bases)
 paramtype(b::CombinedBasis) = mapreduce(paramtype, promote_type, b.bases; init = Bool)
 
-function eval_basis!(out, b::CombinedBasis, t)
-    i = 0
-    for sub in b.bases
-        n = nbasis(sub)
-        eval_basis!(view(out, (i + 1):(i + n)), sub, t)
-        i += n
-    end
-    return out
+# Recursion over the tuple rather than a `for` loop: the bases are of different types, so a loop
+# variable over them would not be inferable, and every row of a design matrix would pay one
+# dynamic dispatch and one allocation per sub-basis. `Vararg{Any, N}` makes Julia specialize on
+# the number of bases left; with a plain `rest...` it stops doing so from three on, and a sum of
+# four or more bases allocates again.
+eval_basis!(out, b::CombinedBasis, t) = (_eval_bases!(out, 0, t, b.bases...); out)
+
+_eval_bases!(_, _, _) = nothing
+function _eval_bases!(out, i, t, sub, rest::Vararg{Any, N}) where {N}
+    n = nbasis(sub)
+    eval_basis!(view(out, (i + 1):(i + n)), sub, t)
+    return _eval_bases!(out, i + n, t, rest...)
 end
 
 function Base.show(io::IO, b::CombinedBasis)

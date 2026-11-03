@@ -18,8 +18,11 @@ using LinkFunctions: LinkFunctions, Link, linkfun, linkinv
 using LogExpFunctions: logistic, logit
 using Distributions: Distributions, logpdf
 using ADTypes: ADTypes
-using OptimizationBase: OptimizationFunction, OptimizationProblem, solve
-using SciMLBase: SciMLBase
+# The problem types and `solve` are SciMLBase's. Every package that can actually run that `solve`
+# (OptimizationOptimJL, OptimizationMOI, …) brings OptimizationBase with it, so depending on it
+# here bought nothing but its load time, and that of SparseConnectivityTracer and
+# SparseMatrixColorings behind it: ~100 ms on every `using`.
+using SciMLBase: SciMLBase, OptimizationFunction, OptimizationProblem, solve
 using StatsAPI: StatsAPI, fit, coef, params
 
 # Links
