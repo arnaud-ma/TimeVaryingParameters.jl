@@ -187,6 +187,114 @@ function eval_basis!(out, b::IndicatorBasis, t)
     return out
 end
 
+# ## Splines
+
+"""
+    BSplineBasis(knots; degree = 3)
+    BSplineBasis(lower, upper, n; degree = 3)
+
+B-splines of degree `degree` on the strictly increasing `knots`, whose first and last entries
+are the ends of the interval: `length(knots) + degree - 1` columns. The second form places `n`
+equally spaced knots from `lower` to `upper`.
+
+The columns sum to one at every `t`, so the basis already contains the intercept: do not add
+`ConstantBasis()`. Outside the interval, `t` is clamped to its ends. For a periodic `t`, use
+[`CyclicBSplineBasis`](@ref).
+"""
+struct BSplineBasis{K <: Real} <: AbstractBasis
+    knots::Vector{K}
+    degree::Int
+
+    function BSplineBasis(knots::AbstractVector{K}; degree::Integer = 3) where {K <: Real}
+        @argcheck degree >= 0
+        @argcheck length(knots) >= 2 "a B-spline basis needs at least the two ends of its interval"
+        @argcheck all(diff(knots) .> 0) "knots must be strictly increasing"
+        return new{K}(collect(knots), Int(degree))
+    end
+end
+
+BSplineBasis(lower::Real, upper::Real, n::Integer; degree::Integer = 3) =
+    BSplineBasis(collect(range(lower, upper; length = n)); degree)
+
+nbasis(b::BSplineBasis) = length(b.knots) + b.degree - 1
+paramtype(::BSplineBasis{K}) where {K} = K
+
+# Cox-de Boor recursion (Piegl & Tiller, The NURBS Book, A2.2), in place: the `degree + 1`
+# functions that are not zero at `x` are written straight into their slots of `out`.
+# The extended knot vector repeats each end `degree + 1` times; `τ` reads it without building it.
+function eval_basis!(out, b::BSplineBasis, t)
+    p, k = b.degree, b.knots
+    m = length(k)
+    x = clamp(t, first(k), last(k))
+    s = clamp(searchsortedlast(k, x), 1, m - 1) + p   # span: τ(s) ≤ x < τ(s + 1)
+    τ(i) = k[clamp(i - p, 1, m)]
+    fill!(out, zero(eltype(out)))
+    o = s - p                                         # out[o + r] holds function s - p + r
+    out[o] = one(eltype(out))
+    @inbounds for d in 1:p
+        saved = zero(eltype(out))
+        for r in 0:(d - 1)
+            right = τ(s + r + 1) - x
+            left = x - τ(s + 1 - d + r)
+            temp = out[o + r] / (right + left)
+            out[o + r] = saved + right * temp
+            saved = left * temp
+        end
+        out[o + d] = saved
+    end
+    return out
+end
+
+"""
+    CyclicBSplineBasis(period, n; degree = 3)
+
+Periodic B-splines of degree `degree` on `n` equally spaced knots over one period: `n` columns,
+each taking the same value at `t` and `t + period`. The columns sum to one, so the basis already
+contains the intercept: do not add `ConstantBasis()`.
+
+The periodic counterpart of [`BSplineBasis`](@ref), and an alternative to [`TrigBasis`](@ref)
+for cycles a few harmonics cannot follow, such as several peaks per period.
+"""
+struct CyclicBSplineBasis{P <: Real} <: AbstractBasis
+    period::P
+    n::Int
+    degree::Int
+
+    function CyclicBSplineBasis(period::P, n::Integer; degree::Integer = 3) where {P <: Real}
+        @argcheck period > 0
+        @argcheck degree >= 0
+        @argcheck n > degree "a cyclic basis of degree $degree needs more than $degree knots"
+        return new{P}(period, Int(n), Int(degree))
+    end
+end
+
+nbasis(b::CyclicBSplineBasis) = b.n
+paramtype(::CyclicBSplineBasis{P}) where {P} = P
+
+# The same recursion on the uniform knots 0, 1, 2, … (in units of the knot spacing), with the
+# function indices wrapped around the period. `n > degree` keeps the wrapped indices distinct.
+function eval_basis!(out, b::CyclicBSplineBasis, t)
+    p, n = b.degree, b.n
+    x = t * n / b.period
+    x -= n * floor(x / n)                             # one period, in [0, n)
+    s = min(floor(Int, x), n - 1)                     # span: s ≤ x < s + 1
+    slot(r) = mod(s - p + r, n) + 1                   # slot of function s - p + r
+    fill!(out, zero(eltype(out)))
+    out[slot(0)] = one(eltype(out))
+    @inbounds for d in 1:p
+        saved = zero(eltype(out))
+        for r in 0:(d - 1)
+            right = s + r + 1 - x
+            left = x - (s + 1 - d + r)
+            temp = out[slot(r)] / (right + left)
+            out[slot(r)] = saved + right * temp
+            saved = left * temp
+        end
+        out[slot(d)] = saved
+    end
+    return out
+end
+
 # ## Sums
 
 """
@@ -228,3 +336,7 @@ Base.show(io::IO, ::ConstantBasis) = print(io, "ConstantBasis()")
 Base.show(io::IO, b::FourierBasis) = print(io, "FourierBasis(", b.period, ", ", b.order, ")")
 Base.show(io::IO, b::PolynomialBasis) = print(io, "PolynomialBasis(", b.degree, ")")
 Base.show(io::IO, b::IndicatorBasis) = print(io, "IndicatorBasis(", b.split_by, ", ", b.levels, ")")
+Base.show(io::IO, b::BSplineBasis) =
+    print(io, "BSplineBasis(", b.knots, "; degree = ", b.degree, ")")
+Base.show(io::IO, b::CyclicBSplineBasis) =
+    print(io, "CyclicBSplineBasis(", b.period, ", ", b.n, "; degree = ", b.degree, ")")

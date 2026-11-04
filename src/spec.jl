@@ -144,11 +144,12 @@ end
     initial_coefficients(spec; init...) -> Vector{Float64}
 
 Flat starting vector. Each parameter is given either its starting coefficients as a vector,
-or a single starting *value*, which is placed on the intercept via the link.
+or a single starting *value*: the coefficients that make the parameter that constant.
 
-A scalar is only meaningful when the parameter's basis starts with a `ConstantBasis`;
-otherwise column 1 is not an intercept and the scalar is rejected rather than silently
-written to a slope -- which is what the original draft did.
+A scalar is accepted when the parameter's basis can express a constant: it starts with a
+`ConstantBasis` (the value goes on the intercept), or with a [`BSplineBasis`](@ref) or
+[`CyclicBSplineBasis`](@ref) (every spline coefficient takes the value, the columns summing to
+one). Otherwise it is rejected.
 """
 function initial_coefficients(spec::ParamSpec; init...)
     nt = NamedTuple(init)
@@ -159,11 +160,11 @@ function initial_coefficients(spec::ParamSpec; init...)
         v = nt[nm]
         β = coefs(spec, θ, j)
         if v isa Number
-            has_intercept(spec.bases[j]) || throw(ArgumentError(
+            set_constant!(β, spec.bases[j], invert_link(spec.links[j], v)) || throw(ArgumentError(
                 "parameter `$(nm)` got the scalar start $(v), but its basis $(spec.bases[j]) " *
-                "has no leading `ConstantBasis`, so column 1 is not an intercept; " *
+                "starts with neither a `ConstantBasis` nor a spline basis, so it has no " *
+                "coefficients that make it a constant; " *
                 "pass a coefficient vector of length $(nbasis(spec.bases[j])) instead"))
-            β[1] = invert_link(spec.links[j], v)
         else
             @argcheck length(v) == nbasis(spec.bases[j])
             β .= v
@@ -172,10 +173,13 @@ function initial_coefficients(spec::ParamSpec; init...)
     return θ
 end
 
-# Whether column 1 of this basis is the intercept.
-has_intercept(::AbstractBasis) = false
-has_intercept(::ConstantBasis) = true
-has_intercept(b::CombinedBasis) = has_intercept(first(b.bases))
+# Write into the zeroed `β` the coefficients that make the expansion the constant `η`, and say
+# whether this basis can. A combined basis does it through its first term, the rest left at zero.
+set_constant!(β, ::AbstractBasis, η) = false
+set_constant!(β, ::ConstantBasis, η) = (β[1] = η; true)
+set_constant!(β, ::Union{BSplineBasis, CyclicBSplineBasis}, η) = (fill!(β, η); true)
+set_constant!(β, b::CombinedBasis, η) =
+    set_constant!(view(β, 1:nbasis(first(b.bases))), first(b.bases), η)
 
 function Base.show(io::IO, ::MIME"text/plain", spec::ParamSpec)
     println(io, "ParamSpec with ", ncoef(spec), " coefficients:")

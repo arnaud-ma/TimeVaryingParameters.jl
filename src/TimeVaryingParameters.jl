@@ -30,6 +30,7 @@ export IntervalLink
 
 # Bases
 export AbstractBasis, ConstantBasis, PolynomialBasis, FourierBasis, IndicatorBasis
+export BSplineBasis, CyclicBSplineBasis
 export CombinedBasis, TrigBasis
 export nbasis, eval_basis, eval_basis!, design_matrix
 

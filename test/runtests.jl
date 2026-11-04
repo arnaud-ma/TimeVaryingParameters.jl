@@ -99,6 +99,70 @@ end
         @test eval_basis(PolynomialBasis(2), d) isa Vector{<:ForwardDiff.Dual}
     end
 
+    @testset "Bases: B-splines" begin
+        # degree 1 is the hat functions, and a single interval of degree 3 the Bernstein basis
+        b1 = BSplineBasis([0.0, 1.0, 2.0]; degree = 1)
+        @test nbasis(b1) == 3
+        @test eval_basis(b1, 0.5) == [0.5, 0.5, 0.0]
+        @test eval_basis(b1, 1.5) == [0.0, 0.5, 0.5]
+        x = 0.3
+        @test eval_basis(BSplineBasis([0.0, 1.0]), x) ≈ [(1 - x)^3, 3x * (1 - x)^2, 3x^2 * (1 - x), x^3]
+
+        b = BSplineBasis(0, 10, 6)                 # 6 knots, cubic
+        @test nbasis(b) == 6 + 3 - 1
+        ts = range(-1, 11; length = 501)
+        M = design_matrix(b, ts)
+        @test all(≥(0), M)
+        @test all(sum(M; dims = 2) .≈ 1)           # a partition of unity: the intercept is inside
+        @test eval_basis(b, 0.0)[1] == 1 && eval_basis(b, 10.0)[end] == 1
+        @test eval_basis(b, -5.0) == eval_basis(b, 0.0)   # clamped outside the interval
+        # a cubic is reproduced exactly
+        tt = collect(range(0, 10; length = 200))
+        X = design_matrix(b, tt)
+        f = @. 1 - 2tt + 0.3tt^2 - 0.02tt^3
+        @test maximum(abs, X * (X \ f) - f) < 1e-10
+        for p in 0:4
+            @test all(sum(design_matrix(BSplineBasis(0, 10, 7; degree = p), ts); dims = 2) .≈ 1)
+        end
+
+        @test_throws ArgumentError BSplineBasis([0.0, 2.0, 1.0])
+        @test_throws ArgumentError BSplineBasis([1.0])
+        @test_throws ArgumentError BSplineBasis([0.0, 1.0]; degree = -1)
+    end
+
+    @testset "Bases: cyclic B-splines" begin
+        c = CyclicBSplineBasis(24, 8)
+        @test nbasis(c) == 8
+        # at a knot, a cubic B-spline basis takes the values 1/6, 2/3, 1/6
+        @test sort(eval_basis(c, 3.0)) ≈ [0, 0, 0, 0, 0, 1 / 6, 1 / 6, 2 / 3]
+        ts = range(0, 48; length = 501)
+        M = design_matrix(c, ts)
+        @test all(≥(0), M)
+        @test all(sum(M; dims = 2) .≈ 1)
+        @test design_matrix(c, ts .+ 24) ≈ M      # periodic
+        @test eval_basis(c, 24 - 1e-9) ≈ eval_basis(c, 0.0) atol = 1e-8   # continuous across the wrap
+        for p in 0:4
+            @test all(sum(design_matrix(CyclicBSplineBasis(10, 6; degree = p), ts); dims = 2) .≈ 1)
+        end
+        # a smooth periodic curve with two peaks per period, which one harmonic cannot follow
+        tt = 1:24
+        f = @. sin(4π * tt / 24) + 0.5cos(2π * tt / 24)
+        fit_err(B) = (X = design_matrix(B, tt); maximum(abs, X * (X \ f) - f))
+        @test fit_err(CyclicBSplineBasis(24, 12)) < 0.05 < fit_err(TrigBasis(24, 1))
+
+        @test_throws ArgumentError CyclicBSplineBasis(24, 3)    # needs more knots than its degree
+        @test_throws ArgumentError CyclicBSplineBasis(-1, 8)
+    end
+
+    @testset "Bases: splines in a ParamSpec" begin
+        spec = ParamSpec(μ = BSplineBasis(1, 50, 5) => IdentityLink(), σ = CyclicBSplineBasis(50, 6) => LogLink())
+        @test ncoef(spec) == (5 + 3 - 1) + 6
+        θ = initial_coefficients(spec; μ = 2.0, σ = 1.5)
+        # every spline column sums to one, so constant starting values are exact everywhere
+        @test all(parameters_at(spec, θ, t)[1] ≈ 2.0 for t in (1, 17, 50))
+        @test all(parameters_at(spec, θ, t)[2] ≈ 1.5 for t in (1, 17, 50))
+    end
+
     @testset "COMPATIBILITY: TrigBasis reproduces SmoothPeriodicStatsModels exactly" begin
         # Bit-identical, not merely approximate: stored coefficient vectors keep their meaning
         # and a refit reproduces the same numbers.

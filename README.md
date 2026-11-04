@@ -46,6 +46,11 @@ fitted(196)                 # a Normal, from Distributions.jl
 | `TrigBasis(period, order)` | `2·order + 1` | `ConstantBasis() + FourierBasis(…)` |
 | `PolynomialBasis(d; center, scale)` | `d` | centre and scale it, or the Hessian suffers |
 | `IndicatorBasis(f, levels)` | `length(levels)` | one-hot, e.g. `(Dates.month, 1:12)` |
+| `BSplineBasis(lower, upper, n; degree = 3)` | `n + degree - 1` | clamped B-splines on `n` equally spaced knots; also `BSplineBasis(knots)` |
+| `CyclicBSplineBasis(period, n; degree = 3)` | `n` | periodic B-splines on `n` equally spaced knots |
+
+Both B-spline bases sum to one at every point, so they contain the intercept: do not add a
+`ConstantBasis()` to them.
 
 They compose with `+`, so `ConstantBasis() + PolynomialBasis(1) + FourierBasis(365, 3)` is a
 trend plus a seasonal cycle.
